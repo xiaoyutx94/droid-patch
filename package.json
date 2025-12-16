@@ -1,6 +1,6 @@
 {
   "name": "droid-patch",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "CLI tool to patch droid binary with various modifications",
   "homepage": "https://github.com/kingsword09/droid-patch#readme",
   "bugs": {
@@ -47,7 +47,7 @@
     "oxlint": "^1.32.0",
     "oxlint-tsgolint": "^0.9.0",
     "tsdown": "^0.17.4",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=22.0.0"
