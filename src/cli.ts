@@ -437,13 +437,14 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
 
       // Bypass reasoning effort validation to allow settings.json override
       // This allows "xhigh" in settings.json to work even though default is "high"
-      // Original: if(R&&!B.supportedReasoningEfforts.includes(R)) throw error
-      // Changed:  if(0&&...) - never throws, any value is accepted
+      // v0.39.0+: T!=="none"&&T!=="off"&&!W.supportedReasoningEfforts.includes(T)
+      // Changed:  T!="none"&&T!="off"&&0&&W... - use != (2 chars less) + 0&& (2 chars more) = same length
+      // Logic: && 0 && makes entire condition always false, bypassing validation
       patches.push({
         name: "reasoningEffortValidationBypass",
         description: "Bypass reasoning effort validation (allows xhigh in settings.json)",
-        pattern: Buffer.from("if(R&&!B.supportedReasoningEfforts.includes(R))"),
-        replacement: Buffer.from("if(0&&!B.supportedReasoningEfforts.includes(R))"),
+        pattern: Buffer.from('T!=="none"&&T!=="off"&&!W.supportedReasoningEfforts.includes(T)'),
+        replacement: Buffer.from('T!="none"&&T!="off"&&0&&W.supportedReasoningEfforts.includes(T)'),
       });
     }
 
@@ -796,8 +797,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
           patches.push({
             name: "reasoningEffortValidationBypass",
             description: "Bypass reasoning effort validation (allows xhigh in settings.json)",
-            pattern: Buffer.from("if(R&&!B.supportedReasoningEfforts.includes(R))"),
-            replacement: Buffer.from("if(0&&!B.supportedReasoningEfforts.includes(R))"),
+            pattern: Buffer.from('T!=="none"&&T!=="off"&&!W.supportedReasoningEfforts.includes(T)'),
+            replacement: Buffer.from('T!="none"&&T!="off"&&0&&W.supportedReasoningEfforts.includes(T)'),
           });
         }
 
