@@ -152,6 +152,7 @@ function createCompressOptimizePatches(): Patch[] {
     {
       name: "compressDeltaWindowWithSummary",
       description: "Summarize only removable delta window when previous summary exists",
+      optional: true,
       pattern: Buffer.from(
         'let MH=Math.max(0,N.anchorIndex+1),HH=A.slice(MH);o("[Compaction] Summarizing history (delta)",{usesConversationSummary:!0,messagesToSummarizeCount:HH.length}),Y=await I({messages:HH,sessionId:H.sessionId,previousSummary:N.text,previousSummaryTokens:N.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
       ),
@@ -162,6 +163,7 @@ function createCompressOptimizePatches(): Patch[] {
     {
       name: "compressDeltaWindowNoSummary",
       description: "Summarize only removable prefix when no previous summary exists",
+      optional: true,
       pattern: Buffer.from(
         'o("[Compaction] Summarizing history",{usesConversationSummary:!1,messagesToSummarizeCount:A.length}),Y=await I({messages:A,sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
       ),
@@ -178,6 +180,7 @@ function createCompressOptimizePatches(): Patch[] {
     {
       name: "compressSummaryBudgetTighten",
       description: "Tighten summary soft/reserve budgets (2000/4000 -> 1600/3200)",
+      optional: true,
       pattern: Buffer.from("var YDI=2000,ZDI=4000;"),
       replacement: Buffer.from("var YDI=1600,ZDI=3200;"),
     },
@@ -662,6 +665,7 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
       patches.push({
         name: "noUserAgent",
         description: "Disable built-in User-Agent for custom models",
+        optional: true,
         pattern: Buffer.from(builtInUserAgentPattern),
         replacement: Buffer.from(disableUserAgentReplacement),
         variants: [
@@ -1063,6 +1067,7 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
           patches.push({
             name: "noUserAgent",
             description: "Disable built-in User-Agent for custom models",
+            optional: true,
             pattern: Buffer.from(builtInUserAgentPattern),
             replacement: Buffer.from(disableUserAgentReplacement),
             variants: [
@@ -1081,6 +1086,7 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
         // Determine output path based on whether this is a websearch alias
         const binsDir = join(homedir(), ".droid-patch", "bins");
         const outputPath = join(binsDir, `${meta.name}-patched`);
+        let patchedOutputPath = outputPath;
 
         // Apply patches (only if there are binary patches to apply)
         if (patches.length > 0) {
@@ -1099,11 +1105,16 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
             continue;
           }
 
+          // patchDroid may return inputPath when no required patch update is needed
+          if (result.outputPath) {
+            patchedOutputPath = result.outputPath;
+          }
+
           // Re-sign on macOS
           if (process.platform === "darwin") {
             try {
               const { execSync } = await import("node:child_process");
-              execSync(`codesign --force --deep --sign - "${outputPath}"`, {
+              execSync(`codesign --force --deep --sign - "${patchedOutputPath}"`, {
                 stdio: "pipe",
               });
               if (verbose) {
@@ -1115,7 +1126,7 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
           }
         }
 
-        let execTargetPath = patches.length > 0 ? outputPath : newBinaryPath;
+        let execTargetPath = patches.length > 0 ? patchedOutputPath : newBinaryPath;
 
         // If websearch is enabled, regenerate wrapper files
         // Support both new 'websearch' field and old 'proxy' field for backward compatibility

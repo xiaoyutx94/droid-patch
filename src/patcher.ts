@@ -11,6 +11,8 @@ export interface Patch {
   description: string;
   pattern: Buffer;
   replacement: Buffer;
+  // Optional patches are best-effort: skipped when pattern is absent on a binary version.
+  optional?: boolean;
   variants?: Array<{
     pattern: Buffer;
     replacement: Buffer;
@@ -37,6 +39,7 @@ interface PatchResult {
   positions?: number[];
   success: boolean;
   alreadyPatched?: boolean;
+  optional?: boolean;
 }
 
 export interface PatchDroidResult {
@@ -107,6 +110,7 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
       if (matches.length === 0) {
         console.log(styleText("yellow", `    ! Pattern not found - may already be patched`));
         let alreadyPatched = false;
+        const optional = !!patch.optional;
         if (patch.alreadyPatchedRegexPattern) {
           const alreadyPatchedRegex = new RegExp(patch.alreadyPatchedRegexPattern.source, "g");
           alreadyPatched = alreadyPatchedRegex.test(content);
@@ -118,11 +122,14 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         results.push({
           name: patch.name,
           found: 0,
-          success: alreadyPatched,
+          success: alreadyPatched || optional,
           alreadyPatched,
+          optional,
         });
         if (alreadyPatched) {
           console.log(styleText("blue", `    ✓ Binary appears to be already patched`));
+        } else if (optional) {
+          console.log(styleText("yellow", `    ! Optional patch not found - skipped`));
         }
         continue;
       }
@@ -157,6 +164,7 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         found: matches.length,
         positions: matches.map((m) => m.charIndex),
         success: true,
+        optional: !!patch.optional,
       });
       continue;
     }
@@ -179,11 +187,14 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
 
     if (positions.length === 0) {
       console.log(styleText("yellow", `    ! Pattern not found - may already be patched`));
+      const optional = !!patch.optional;
+      const alreadyPatched = variants.some((v) => workingBuffer.includes(v.replacement));
       results.push({
         name: patch.name,
         found: 0,
-        success: false,
-        alreadyPatched: variants.some((v) => workingBuffer.includes(v.replacement)),
+        success: alreadyPatched || optional,
+        alreadyPatched,
+        optional,
       });
 
       let totalReplacementPositions = 0;
@@ -200,6 +211,8 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         console.log(styleText("blue", `    ✓ Binary appears to be already patched`));
         results[results.length - 1].alreadyPatched = true;
         results[results.length - 1].success = true;
+      } else if (optional) {
+        console.log(styleText("yellow", `    ! Optional patch not found - skipped`));
       }
       continue;
     }
@@ -234,6 +247,7 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
       found: positions.length,
       positions,
       success: true,
+      optional: !!patch.optional,
     });
   }
 
@@ -252,6 +266,8 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         console.log(
           styleText("green", `  [✓] ${result.name}: ${result.found} occurrences will be patched`),
         );
+      } else if (result.optional) {
+        console.log(styleText("yellow", `  [~] ${result.name}: Optional patch skipped`));
       } else {
         console.log(styleText("yellow", `  [!] ${result.name}: Pattern not found`));
       }
@@ -265,11 +281,17 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
   }
 
   const patchesNeeded = results.filter((r) => r.found > 0 && !r.alreadyPatched);
+  const requiredResults = results.filter((r) => !r.optional);
+  const allRequiredSatisfied = requiredResults.every((r) => r.success || r.alreadyPatched);
 
   if (patchesNeeded.length === 0) {
-    const allPatched = results.every((r) => r.alreadyPatched);
-    if (allPatched) {
-      console.log(styleText("blue", "[*] All patches already applied. Binary is up to date."));
+    const allPatched = requiredResults.length > 0 && requiredResults.every((r) => r.alreadyPatched);
+    if (allRequiredSatisfied) {
+      if (allPatched) {
+        console.log(styleText("blue", "[*] All patches already applied. Binary is up to date."));
+      } else {
+        console.log(styleText("blue", "[*] No required patch changes needed."));
+      }
       return {
         success: true,
         outputPath: inputPath,
@@ -277,6 +299,7 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         noPatchNeeded: true,
       };
     }
+
     console.log(styleText("yellow", "[!] No patches could be applied."));
     return { success: false, results };
   }
@@ -332,6 +355,8 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
 
   let allVerified = true;
   for (const patch of patches) {
+    const runResult = results.find((r) => r.name === patch.name);
+
     // Handle regex-based patches
     if (patch.regexPattern && patch.regexReplacement) {
       const content = verifyBuffer.toString("utf-8");
@@ -339,6 +364,13 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
       // For verification, just check that the original pattern is no longer present
       if (oldMatches.length === 0) {
         console.log(styleText("green", `    ✓ ${patch.name}: Verified (regex)`));
+      } else if (patch.optional) {
+        console.log(
+          styleText(
+            "yellow",
+            `    ! ${patch.name}: Optional patch not applied for this binary version`,
+          ),
+        );
       } else {
         console.log(
           styleText("red", `    ✗ ${patch.name}: ${oldMatches.length} occurrences not patched`),
@@ -364,10 +396,11 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
       }
     }
 
-    const runResult = results.find((r) => r.name === patch.name);
     if (oldCount === 0) {
       if (newCount > 0 || (runResult?.found ?? 0) > 0 || runResult?.alreadyPatched) {
         console.log(styleText("green", `    ✓ ${patch.name}: Verified (${newCount} patched)`));
+      } else if (patch.optional) {
+        console.log(styleText("yellow", `    ! ${patch.name}: Optional patch not found - skipped`));
       } else {
         console.log(
           styleText(
@@ -377,6 +410,8 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
         );
         allVerified = false;
       }
+    } else if (patch.optional) {
+      console.log(styleText("yellow", `    ! ${patch.name}: Optional patch not fully applied`));
     } else {
       console.log(styleText("red", `    ✗ ${patch.name}: ${oldCount} occurrences not patched`));
       allVerified = false;
