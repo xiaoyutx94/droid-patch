@@ -32,6 +32,12 @@ npx droid-patch --websearch --standalone droid-local
 # 使用 --reasoning-effort 为自定义模型启用推理功能
 npx droid-patch --reasoning-effort droid-reasoning
 
+# 使用 --disable-user-agent 禁用内置 User-Agent 请求头
+npx droid-patch --disable-user-agent droid-no-ua
+
+# 使用 --compress-optimize 启用压缩优化补丁集
+npx droid-patch --compress-optimize droid-compress
+
 # 组合多个修补选项
 npx droid-patch --is-custom --skip-login --websearch --reasoning-effort droid-full
 
@@ -57,21 +63,23 @@ npx droid-patch --skip-login -o /path/to/dir my-droid
 
 ### 可用选项
 
-| 选项                  | 说明                                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------------------- |
-| `--is-custom`         | 将 `isCustom:!0` 修改为 `isCustom:!1`（为自定义模型启用上下文压缩）                             |
-| `--skip-login`        | 通过注入假的 `FACTORY_API_KEY` 跳过登录验证                                                     |
-| `--api-base <url>`    | 替换 API URL（单独使用：二进制补丁，最多 22 字符；与 `--websearch` 配合：代理转发目标，无限制） |
-| `--websearch`         | 外部搜索模式：使用 Smithery、Google PSE、Tavily、Serper、Brave、SearXNG、DuckDuckGo             |
-| `--websearch-proxy`   | 原生搜索模式：使用模型内置的 web_search 能力（需要 proxy 插件）                                 |
-| `--standalone`        | 独立模式：mock 非 LLM 的 Factory API（与 `--websearch` 或 `--websearch-proxy` 配合使用）        |
-| `--reasoning-effort`  | 为自定义模型启用推理强度 UI 选择器（默认 `high`；可选：`high`、`max`、`xhigh`）                 |
-| `--disable-telemetry` | 禁用遥测数据上传和 Sentry 错误报告                                                              |
-| `--dry-run`           | 验证修补但不实际修改二进制文件                                                                  |
-| `-p, --path <path>`   | droid 二进制文件路径（默认：`~/.droid/bin/droid`）                                              |
-| `-o, --output <dir>`  | 修补后二进制文件的输出目录（直接创建文件，不创建别名）                                          |
-| `--no-backup`         | 跳过创建原始二进制文件的备份                                                                    |
-| `-v, --verbose`       | 启用详细输出                                                                                    |
+| 选项                   | 说明                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| `--is-custom`          | 将 `isCustom:!0` 修改为 `isCustom:!1`（为自定义模型启用上下文压缩）                             |
+| `--skip-login`         | 通过注入假的 `FACTORY_API_KEY` 跳过登录验证                                                     |
+| `--api-base <url>`     | 替换 API URL（单独使用：二进制补丁，最多 22 字符；与 `--websearch` 配合：代理转发目标，无限制） |
+| `--websearch`          | 外部搜索模式：使用 Smithery、Google PSE、Tavily、Serper、Brave、SearXNG、DuckDuckGo             |
+| `--websearch-proxy`    | 原生搜索模式：使用模型内置的 web_search 能力（需要 proxy 插件）                                 |
+| `--standalone`         | 独立模式：mock 非 LLM 的 Factory API（与 `--websearch` 或 `--websearch-proxy` 配合使用）        |
+| `--reasoning-effort`   | 为自定义模型启用推理强度 UI 选择器（默认 `high`；可选：`high`、`max`、`xhigh`）                 |
+| `--disable-telemetry`  | 禁用遥测数据上传和 Sentry 错误报告                                                              |
+| `--disable-user-agent` | 禁用自定义模型请求中的内置 `User-Agent` 请求头                                                  |
+| `--compress-optimize`  | 启用压缩优化补丁集（缩写 + 增量压缩 + 预算收紧）                                                |
+| `--dry-run`            | 验证修补但不实际修改二进制文件                                                                  |
+| `-p, --path <path>`    | droid 二进制文件路径（默认：`~/.droid/bin/droid`）                                              |
+| `-o, --output <dir>`   | 修补后二进制文件的输出目录（直接创建文件，不创建别名）                                          |
+| `--no-backup`          | 跳过创建原始二进制文件的备份                                                                    |
+| `-v, --verbose`        | 启用详细输出                                                                                    |
 
 ### 管理自定义模型
 
@@ -124,6 +132,8 @@ npx droid-patch remove /path/to/patched-binary
 npx droid-patch remove --patch-version=0.4.0     # 按 droid-patch 版本
 npx droid-patch remove --droid-version=1.0.40    # 按 droid 版本
 npx droid-patch remove --flag=websearch          # 按功能 flag
+npx droid-patch remove --flag=disable-user-agent # 按功能 flag
+npx droid-patch remove --flag=compress-optimize  # 按功能 flag
 
 # 清除所有 droid-patch 数据（别名、二进制文件、元数据）
 npx droid-patch clear
@@ -425,6 +435,44 @@ npx droid-patch --disable-telemetry droid-private
 
 # 与其他补丁组合
 npx droid-patch --is-custom --skip-login --disable-telemetry droid-private
+```
+
+### `--disable-user-agent`
+
+禁用自定义模型请求中的内置 `User-Agent` 请求头。
+
+**用途**：仅使用你在 `extraHeaders` 中配置的请求头，避免默认 UA 指纹。
+
+**使用方法**：
+
+```bash
+# 仅禁用内置 User-Agent
+npx droid-patch --disable-user-agent droid-no-ua
+
+# 与自定义模型补丁组合
+npx droid-patch --is-custom --disable-user-agent droid-custom-no-ua
+```
+
+### `--compress-optimize`
+
+启用会话压缩优化补丁集。
+
+**用途**：在长会话中降低压缩开销，并收紧摘要/上下文预算。
+
+**包含的修补**：
+
+1. 默认启用摘要中的工具调用缩写
+2. 生成摘要时采用增量/差量压缩窗口
+3. 收紧摘要预算与压缩后硬阈值默认值
+
+**使用方法**：
+
+```bash
+# 启用压缩优化补丁集
+npx droid-patch --compress-optimize droid-compress
+
+# 与其他补丁组合
+npx droid-patch --is-custom --compress-optimize droid-custom-compress
 ```
 
 ---

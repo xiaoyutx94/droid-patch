@@ -32,6 +32,12 @@ npx droid-patch --websearch --standalone droid-local
 # Patch with --reasoning-effort to enable reasoning for custom models
 npx droid-patch --reasoning-effort droid-reasoning
 
+# Patch with --disable-user-agent to remove built-in User-Agent header
+npx droid-patch --disable-user-agent droid-no-ua
+
+# Patch with --compress-optimize to optimize compaction behavior
+npx droid-patch --compress-optimize droid-compress
+
 # Combine multiple patches
 npx droid-patch --is-custom --skip-login --websearch --reasoning-effort droid-full
 
@@ -57,21 +63,23 @@ npx droid-patch --skip-login -o /path/to/dir my-droid
 
 ### Available Options
 
-| Option                | Description                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `--is-custom`         | Patch `isCustom:!0` to `isCustom:!1` (enables context compression for custom models)                         |
-| `--skip-login`        | Bypass login by injecting a fake `FACTORY_API_KEY` into the binary                                           |
-| `--api-base <url>`    | Replace API URL (standalone: binary patch, max 22 chars; with `--websearch`: proxy forward target, no limit) |
-| `--websearch`         | External providers mode: Smithery, Google PSE, Tavily, Serper, Brave, SearXNG, DuckDuckGo                    |
-| `--websearch-proxy`   | Native provider mode: use model's built-in web_search (requires proxy plugin)                                |
-| `--standalone`        | Standalone mode: mock non-LLM Factory APIs (use with `--websearch` or `--websearch-proxy`)                   |
-| `--reasoning-effort`  | Enable reasoning effort UI selector for custom models (default `high`; options: `high`, `max`, `xhigh`)      |
-| `--disable-telemetry` | Disable telemetry and Sentry error reporting                                                                 |
-| `--dry-run`           | Verify patches without actually modifying the binary                                                         |
-| `-p, --path <path>`   | Path to the droid binary (default: `~/.droid/bin/droid`)                                                     |
-| `-o, --output <dir>`  | Output directory for patched binary (creates file without alias)                                             |
-| `--no-backup`         | Skip creating backup of original binary                                                                      |
-| `-v, --verbose`       | Enable verbose output                                                                                        |
+| Option                 | Description                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--is-custom`          | Patch `isCustom:!0` to `isCustom:!1` (enables context compression for custom models)                         |
+| `--skip-login`         | Bypass login by injecting a fake `FACTORY_API_KEY` into the binary                                           |
+| `--api-base <url>`     | Replace API URL (standalone: binary patch, max 22 chars; with `--websearch`: proxy forward target, no limit) |
+| `--websearch`          | External providers mode: Smithery, Google PSE, Tavily, Serper, Brave, SearXNG, DuckDuckGo                    |
+| `--websearch-proxy`    | Native provider mode: use model's built-in web_search (requires proxy plugin)                                |
+| `--standalone`         | Standalone mode: mock non-LLM Factory APIs (use with `--websearch` or `--websearch-proxy`)                   |
+| `--reasoning-effort`   | Enable reasoning effort UI selector for custom models (default `high`; options: `high`, `max`, `xhigh`)      |
+| `--disable-telemetry`  | Disable telemetry and Sentry error reporting                                                                 |
+| `--disable-user-agent` | Disable built-in `User-Agent` header for custom model requests                                               |
+| `--compress-optimize`  | Enable compress optimization patch set (abbreviation + incremental + budget gate)                            |
+| `--dry-run`            | Verify patches without actually modifying the binary                                                         |
+| `-p, --path <path>`    | Path to the droid binary (default: `~/.droid/bin/droid`)                                                     |
+| `-o, --output <dir>`   | Output directory for patched binary (creates file without alias)                                             |
+| `--no-backup`          | Skip creating backup of original binary                                                                      |
+| `-v, --verbose`        | Enable verbose output                                                                                        |
 
 ### Manage Custom Models
 
@@ -124,6 +132,8 @@ npx droid-patch remove /path/to/patched-binary
 npx droid-patch remove --patch-version=0.4.0     # by droid-patch version
 npx droid-patch remove --droid-version=1.0.40    # by droid version
 npx droid-patch remove --flag=websearch          # by feature flag
+npx droid-patch remove --flag=disable-user-agent # by feature flag
+npx droid-patch remove --flag=compress-optimize  # by feature flag
 
 # Clear all droid-patch data (aliases, binaries, metadata)
 npx droid-patch clear
@@ -431,6 +441,44 @@ npx droid-patch --disable-telemetry droid-private
 
 # Combine with other patches
 npx droid-patch --is-custom --skip-login --disable-telemetry droid-private
+```
+
+### `--disable-user-agent`
+
+Disables the built-in `User-Agent` header for custom model requests.
+
+**Purpose**: Force requests to use only your configured `extraHeaders`, avoiding droid's default UA fingerprint.
+
+**Usage**:
+
+```bash
+# Disable built-in User-Agent header
+npx droid-patch --disable-user-agent droid-no-ua
+
+# Combine with custom model patches
+npx droid-patch --is-custom --disable-user-agent droid-custom-no-ua
+```
+
+### `--compress-optimize`
+
+Enables a compaction optimization patch set for conversation compression.
+
+**Purpose**: Reduce compression overhead and keep summary/token budgets tighter during long sessions.
+
+**What it patches**:
+
+1. Enable tool transcript abbreviation by default in summarizer
+2. Use incremental/delta compaction windows when generating summaries
+3. Tighten compaction summary budgets and post-compaction threshold defaults
+
+**Usage**:
+
+```bash
+# Enable compress optimization patch set
+npx droid-patch --compress-optimize droid-compress
+
+# Combine with other patches
+npx droid-patch --is-custom --compress-optimize droid-custom-compress
 ```
 
 ---
