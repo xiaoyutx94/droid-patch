@@ -135,6 +135,55 @@ function findDefaultDroidPath(): string {
   return join(home, ".droid", "bin", "droid");
 }
 
+function createCompressOptimizePatches(): Patch[] {
+  return [
+    {
+      name: "compressAbbreviateToolsDefault",
+      description: "Enable abbreviated tool transcript by default in summarizer",
+      pattern: Buffer.from("abbreviateTools:L=!1"),
+      replacement: Buffer.from("abbreviateTools:L=!0"),
+    },
+    {
+      name: "compressToolsAbbreviatedFlagDefault",
+      description: "Mark default summarizer request as tools-abbreviated",
+      pattern: Buffer.from("toolsAbbreviated:!1"),
+      replacement: Buffer.from("toolsAbbreviated:!0"),
+    },
+    {
+      name: "compressDeltaWindowWithSummary",
+      description: "Summarize only removable delta window when previous summary exists",
+      pattern: Buffer.from(
+        'let MH=Math.max(0,N.anchorIndex+1),HH=A.slice(MH);o("[Compaction] Summarizing history (delta)",{usesConversationSummary:!0,messagesToSummarizeCount:HH.length}),Y=await I({messages:HH,sessionId:H.sessionId,previousSummary:N.text,previousSummaryTokens:N.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
+      ),
+      replacement: Buffer.from(
+        'let MH=Math.max(0,N.anchorIndex+1),HH=A.slice(MH,J);o("[Compaction] Summarizing history (dlt)",{usesConversationSummary:!0,messagesToSummarizeCount:HH.length}),Y=await I({messages:HH,sessionId:H.sessionId,previousSummary:N.text,previousSummaryTokens:N.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
+      ),
+    },
+    {
+      name: "compressDeltaWindowNoSummary",
+      description: "Summarize only removable prefix when no previous summary exists",
+      pattern: Buffer.from(
+        'o("[Compaction] Summarizing history",{usesConversationSummary:!1,messagesToSummarizeCount:A.length}),Y=await I({messages:A,sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
+      ),
+      replacement: Buffer.from(
+        'o("[Compaction] Summarizing hist",{usesConversationSummary:0,messagesToSummarizeCount:J}),Y=await I({messages:A.slice(0,J),sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
+      ),
+    },
+    {
+      name: "compressPostAbsoluteGate",
+      description: "Tighten compaction post-budget hard gate (40000 -> 32000)",
+      pattern: Buffer.from("postAbsolute:H.thresholds?.postAbsolute??40000"),
+      replacement: Buffer.from("postAbsolute:H.thresholds?.postAbsolute??32000"),
+    },
+    {
+      name: "compressSummaryBudgetTighten",
+      description: "Tighten summary soft/reserve budgets (2000/4000 -> 1600/3200)",
+      pattern: Buffer.from("var YDI=2000,ZDI=4000;"),
+      replacement: Buffer.from("var YDI=1600,ZDI=3200;"),
+    },
+  ];
+}
+
 bin("droid-patch", "CLI tool to patch droid binary with various modifications")
   .option(
     "--is-custom",
@@ -165,6 +214,14 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
     "--disable-telemetry",
     "Disable telemetry and Sentry error reporting (block data uploads)",
   )
+  .option(
+    "--disable-user-agent",
+    "Disable built-in User-Agent for custom models (use only extraHeaders)",
+  )
+  .option(
+    "--compress-optimize",
+    "Enable compress optimization patch set (abbreviation + incremental + budget gate)",
+  )
   .option("--dry-run", "Verify patches without actually modifying the binary")
   .option("-p, --path <path>", "Path to the droid binary")
   .option("-o, --output <dir>", "Output directory for patched binary")
@@ -184,6 +241,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
     const websearchTarget = websearch ? apiBase || "https://api.factory.ai" : undefined;
     const reasoningEffort = !!options.reasoningEffort;
     const noTelemetry = !!options.disableTelemetry;
+    const noUserAgent = !!options.disableUserAgent;
+    const compressOptimize = !!options.compressOptimize;
     const dryRun = !!options.dryRun;
     const path = options.path || findDefaultDroidPath();
     const outputDir = options.output;
@@ -198,6 +257,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
       !!skipLogin ||
       !!reasoningEffort ||
       !!noTelemetry ||
+      !!noUserAgent ||
+      !!compressOptimize ||
       (!!apiBase && !websearch && !websearchProxy);
 
     // Check for conflicting flags
@@ -273,6 +334,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
           websearchProxy: !!websearchProxy,
           reasoningEffort: false,
           noTelemetry: false,
+          noUserAgent: false,
+          compressOptimize: false,
           standalone: standalone,
         },
         {
@@ -329,7 +392,16 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
       return;
     }
 
-    if (!isCustom && !skipLogin && !apiBase && !websearch && !reasoningEffort && !noTelemetry) {
+    if (
+      !isCustom &&
+      !skipLogin &&
+      !apiBase &&
+      !websearch &&
+      !reasoningEffort &&
+      !noTelemetry &&
+      !noUserAgent &&
+      !compressOptimize
+    ) {
       console.log(styleText("yellow", "No patch flags specified. Available patches:"));
       console.log(styleText("gray", "  --is-custom         Patch isCustom for custom models"));
       console.log(
@@ -349,6 +421,12 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
         styleText("gray", "  --disable-telemetry Disable telemetry and Sentry error reporting"),
       );
       console.log(
+        styleText("gray", "  --disable-user-agent Disable built-in User-Agent for custom models"),
+      );
+      console.log(
+        styleText("gray", "  --compress-optimize Enable compression optimization patch set"),
+      );
+      console.log(
         styleText("gray", "  --standalone        Standalone mode: mock non-LLM Factory APIs"),
       );
       console.log();
@@ -359,6 +437,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
       console.log(styleText("cyan", "  npx droid-patch --websearch droid-search"));
       console.log(styleText("cyan", "  npx droid-patch --websearch --standalone droid-local"));
       console.log(styleText("cyan", "  npx droid-patch --disable-telemetry droid-private"));
+      console.log(styleText("cyan", "  npx droid-patch --disable-user-agent droid-no-ua"));
+      console.log(styleText("cyan", "  npx droid-patch --compress-optimize droid-compact"));
       console.log(
         styleText(
           "cyan",
@@ -576,6 +656,27 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
       });
     }
 
+    if (noUserAgent) {
+      const builtInUserAgentPattern = '"User-Agent":Cq()';
+      const disableUserAgentReplacement = '"Xser-Agent":Cq()';
+      patches.push({
+        name: "noUserAgent",
+        description: "Disable built-in User-Agent for custom models",
+        pattern: Buffer.from(builtInUserAgentPattern),
+        replacement: Buffer.from(disableUserAgentReplacement),
+        variants: [
+          {
+            pattern: Buffer.from('"User-Agent":aq()'),
+            replacement: Buffer.from('"Xser-Agent":aq()'),
+          },
+        ],
+      });
+    }
+
+    if (compressOptimize) {
+      patches.push(...createCompressOptimizePatches());
+    }
+
     try {
       const result = await patchDroid({
         inputPath: path,
@@ -659,6 +760,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
             websearchProxy: !!websearchProxy,
             reasoningEffort: !!reasoningEffort,
             noTelemetry: !!noTelemetry,
+            noUserAgent: !!noUserAgent,
+            compressOptimize: !!compressOptimize,
             standalone: !!standalone,
           },
           {
@@ -694,7 +797,7 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
   .option("--droid-version <version>", "Remove aliases for this droid version")
   .option(
     "--flag <flag>",
-    "Remove aliases with this flag (is-custom, skip-login, websearch, api-base, reasoning-effort, disable-telemetry, standalone)",
+    "Remove aliases with this flag (is-custom, skip-login, websearch, api-base, reasoning-effort, disable-telemetry, disable-user-agent, compress-optimize, standalone)",
   )
   .action(async (options, args) => {
     const target = args?.[0] as string | undefined;
@@ -710,6 +813,8 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
         "api-base",
         "reasoning-effort",
         "disable-telemetry",
+        "disable-user-agent",
+        "compress-optimize",
         "standalone",
       ];
       if (!allowedFlags.includes(flagRaw as FilterFlag)) {
@@ -950,6 +1055,27 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
             pattern: Buffer.from("this.webEvents.length===0"),
             replacement: Buffer.from("!0||this.webEvents.length"),
           });
+        }
+
+        if (meta.patches.noUserAgent) {
+          const builtInUserAgentPattern = '"User-Agent":Cq()';
+          const disableUserAgentReplacement = '"Xser-Agent":Cq()';
+          patches.push({
+            name: "noUserAgent",
+            description: "Disable built-in User-Agent for custom models",
+            pattern: Buffer.from(builtInUserAgentPattern),
+            replacement: Buffer.from(disableUserAgentReplacement),
+            variants: [
+              {
+                pattern: Buffer.from('"User-Agent":aq()'),
+                replacement: Buffer.from('"Xser-Agent":aq()'),
+              },
+            ],
+          });
+        }
+
+        if (meta.patches.compressOptimize) {
+          patches.push(...createCompressOptimizePatches());
         }
 
         // Determine output path based on whether this is a websearch alias

@@ -1229,6 +1229,8 @@ export type FilterFlag =
   | "api-base"
   | "reasoning-effort"
   | "disable-telemetry"
+  | "disable-user-agent"
+  | "compress-optimize"
   | "standalone";
 
 export interface RemoveFilterOptions {
@@ -1359,6 +1361,12 @@ export async function removeAliasesByFilter(filter: RemoveFilterOptions): Promis
             break;
           case "disable-telemetry":
             if (!patches.noTelemetry) matches = false;
+            break;
+          case "disable-user-agent":
+            if (!patches.noUserAgent) matches = false;
+            break;
+          case "compress-optimize":
+            if (!patches.compressOptimize) matches = false;
             break;
           case "standalone":
             if (!patches.standalone) matches = false;

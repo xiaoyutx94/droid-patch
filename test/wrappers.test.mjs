@@ -8,9 +8,17 @@ void test("websearch wrapper includes passthrough logic", async () => {
   assert.match(src, /help\|version\|completion\|completions\|exec\|plugin/);
 });
 
+void test("source includes compress optimize patch option", async () => {
+  const src = await readFile(new URL("../src/cli.ts", import.meta.url), "utf8");
+  assert.match(src, /--compress-optimize/);
+  assert.match(src, /createCompressOptimizePatches/);
+});
+
 void test("dist bundle contains passthrough logic (published output)", async () => {
   const dist = await readFile(new URL("../dist/cli.mjs", import.meta.url), "utf8");
   assert.match(dist, /should_passthrough\(\)/);
+  assert.match(dist, /--disable-user-agent/);
+  assert.match(dist, /--compress-optimize/);
   assert.doesNotMatch(dist, /--statusline/);
   assert.doesNotMatch(dist, /--sessions/);
 });

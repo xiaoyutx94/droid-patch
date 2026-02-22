@@ -364,8 +364,19 @@ export async function patchDroid(options: PatchOptions): Promise<PatchDroidResul
       }
     }
 
+    const runResult = results.find((r) => r.name === patch.name);
     if (oldCount === 0) {
-      console.log(styleText("green", `    ✓ ${patch.name}: Verified (${newCount} patched)`));
+      if (newCount > 0 || (runResult?.found ?? 0) > 0 || runResult?.alreadyPatched) {
+        console.log(styleText("green", `    ✓ ${patch.name}: Verified (${newCount} patched)`));
+      } else {
+        console.log(
+          styleText(
+            "red",
+            `    ✗ ${patch.name}: Pattern/replacement not found (binary version may be unsupported)`,
+          ),
+        );
+        allVerified = false;
+      }
     } else {
       console.log(styleText("red", `    ✗ ${patch.name}: ${oldCount} occurrences not patched`));
       allVerified = false;
