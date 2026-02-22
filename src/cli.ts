@@ -159,6 +159,16 @@ function createCompressOptimizePatches(): Patch[] {
       replacement: Buffer.from(
         'let MH=Math.max(0,N.anchorIndex+1),HH=A.slice(MH,J);o("[Compaction] Summarizing history (dlt)",{usesConversationSummary:!0,messagesToSummarizeCount:HH.length}),Y=await I({messages:HH,sessionId:H.sessionId,previousSummary:N.text,previousSummaryTokens:N.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
       ),
+      variants: [
+        {
+          pattern: Buffer.from(
+            'let EH=Math.max(0,z.anchorIndex+1),t=A.slice(EH);s("[Compaction] Summarizing history (delta)",{usesConversationSummary:!0,messagesToSummarizeCount:t.length}),Y=await I({messages:t,sessionId:H.sessionId,previousSummary:z.text,previousSummaryTokens:z.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
+          ),
+          replacement: Buffer.from(
+            'let EH=Math.max(0,z.anchorIndex+1),t=A.slice(EH,J);s("[Compaction] Summarizing history (dlt)",{usesConversationSummary:!0,messagesToSummarizeCount:t.length}),Y=await I({messages:t,sessionId:H.sessionId,previousSummary:z.text,previousSummaryTokens:z.tokens,summarySoftCap:f.summarySoftCap,summaryReserve:Q,latestTodos:U?.todos,signal:M})',
+          ),
+        },
+      ],
     },
     {
       name: "compressDeltaWindowNoSummary",
@@ -170,6 +180,16 @@ function createCompressOptimizePatches(): Patch[] {
       replacement: Buffer.from(
         'o("[Compaction] Summarizing hist",{usesConversationSummary:0,messagesToSummarizeCount:J}),Y=await I({messages:A.slice(0,J),sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
       ),
+      variants: [
+        {
+          pattern: Buffer.from(
+            's("[Compaction] Summarizing history",{usesConversationSummary:!1,messagesToSummarizeCount:A.length}),Y=await I({messages:A,sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
+          ),
+          replacement: Buffer.from(
+            's("[Compaction] Summarizing hist",{usesConversationSummary:0,messagesToSummarizeCount:J}),Y=await I({messages:A.slice(0,J),sessionId:H.sessionId,latestTodos:U?.todos,signal:M});',
+          ),
+        },
+      ],
     },
     {
       name: "compressPostAbsoluteGate",
@@ -183,6 +203,12 @@ function createCompressOptimizePatches(): Patch[] {
       optional: true,
       pattern: Buffer.from("var YDI=2000,ZDI=4000;"),
       replacement: Buffer.from("var YDI=1600,ZDI=3200;"),
+      variants: [
+        {
+          pattern: Buffer.from("var GMI=2000,QMI=4000;"),
+          replacement: Buffer.from("var GMI=1600,QMI=3200;"),
+        },
+      ],
     },
   ];
 }
@@ -673,6 +699,10 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
             pattern: Buffer.from('"User-Agent":aq()'),
             replacement: Buffer.from('"Xser-Agent":aq()'),
           },
+          {
+            pattern: Buffer.from('"User-Agent":qw()'),
+            replacement: Buffer.from('"Xser-Agent":qw()'),
+          },
         ],
       });
     }
@@ -1074,6 +1104,10 @@ bin("droid-patch", "CLI tool to patch droid binary with various modifications")
               {
                 pattern: Buffer.from('"User-Agent":aq()'),
                 replacement: Buffer.from('"Xser-Agent":aq()'),
+              },
+              {
+                pattern: Buffer.from('"User-Agent":qw()'),
+                replacement: Buffer.from('"Xser-Agent":qw()'),
               },
             ],
           });
