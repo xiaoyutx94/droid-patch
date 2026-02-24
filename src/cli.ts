@@ -191,25 +191,6 @@ function createCompressOptimizePatches(): Patch[] {
         },
       ],
     },
-    {
-      name: "compressPostAbsoluteGate",
-      description: "Tighten compaction post-budget hard gate (40000 -> 32000)",
-      pattern: Buffer.from("postAbsolute:H.thresholds?.postAbsolute??40000"),
-      replacement: Buffer.from("postAbsolute:H.thresholds?.postAbsolute??32000"),
-    },
-    {
-      name: "compressSummaryBudgetTighten",
-      description: "Tighten summary soft/reserve budgets (2000/4000 -> 1600/3200)",
-      optional: true,
-      pattern: Buffer.from("var YDI=2000,ZDI=4000;"),
-      replacement: Buffer.from("var YDI=1600,ZDI=3200;"),
-      variants: [
-        {
-          pattern: Buffer.from("var GMI=2000,QMI=4000;"),
-          replacement: Buffer.from("var GMI=1600,QMI=3200;"),
-        },
-      ],
-    },
   ];
 }
 
